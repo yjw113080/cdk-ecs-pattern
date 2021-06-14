@@ -4,7 +4,7 @@ import * as cdk from '@aws-cdk/core';
 import { EcsCdkStack } from '../lib/ecs-cdk-stack';
 
 const app = new cdk.App();
-new EcsCdkStack(app, 'EcsCdkStack', {
+new EcsCdkStack(app, 'EcsCdkStack-2', {
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */
