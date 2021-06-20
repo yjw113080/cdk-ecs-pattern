@@ -4,9 +4,10 @@ import * as ecs from '@aws-cdk/aws-ecs';
 import * as ecr from '@aws-cdk/aws-ecr';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as iam from '@aws-cdk/aws-iam';
+import * as logs from '@aws-cdk/aws-logs';
 import * as firehose from '@aws-cdk/aws-kinesisfirehose';
 import * as ecsPatterns from '@aws-cdk/aws-ecs-patterns';
-
+import * as secretsmanager from '@aws-cdk/aws-secretsmanager';
 
 export class EcsCdkStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -25,73 +26,36 @@ export class EcsCdkStack extends cdk.Stack {
     });
     
     const firehoseRole = new iam.Role(this, 'firehoseRole', { 
-      assumedBy: new iam.ServicePrincipal("firehose.amazonaws.com"),
-      inlinePolicies: {
-        'allow-s3-kinesis-logs': new iam.PolicyDocument({
-            statements: [
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: [
-                        "kinesis:DescribeStream",
-                        "kinesis:DescribeStreamSummary",
-                        "kinesis:GetRecords",
-                        "kinesis:GetShardIterator",
-                        "kinesis:ListShards",
-                        "kinesis:SubscribeToShard"
-                    ],
-                    resources: ['*']
-                }),
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: [
-                        "s3:GetObject*",
-                        "s3:GetBucket*",
-                        "s3:List*",
-                        "s3:DeleteObject*",
-                        "s3:PutObject*",
-                        "s3:Abort*"
-                    ],
-                    resources: [
-                        bucket.bucketArn,
-                        bucket.bucketArn + "/*"
-                    ]
-                }),
-                // new iam.PolicyStatement({
-                //     effect: iam.Effect.ALLOW,
-                //     actions: [
-                //         "logs:PutLogEvents"
-                //     ],
-                //     resources: [
-                //         logGroup.logGroupArn
-                //     ]
-                // })
-            ]
-        })
-    }
+      assumedBy: new iam.ServicePrincipal("firehose.amazonaws.com")
     });
+    bucket.grantReadWrite(firehoseRole)
     
-    
+    const firehoseLogGroup = new logs.LogGroup(this, 'FirehoseLogGroup');
+    const firehoseLogStream = new logs.LogStream(this, 'FirehoseLogStream', { logGroup: firehoseLogGroup });
     
     const stream = new firehose.CfnDeliveryStream(this, 'KinesisToS3', {
       deliveryStreamName: 'ecs-firelens',
+      deliveryStreamType: 'DirectPut',
       s3DestinationConfiguration: {
         bucketArn: bucket.bucketArn,
-        roleArn: firehose,
+        roleArn: firehoseRole.roleArn,
         bufferingHints: {
           intervalInSeconds: 60,
           sizeInMBs: 1
         },
-        // cloudWatchLoggingOptions: {
-        //   enabled: true,
-        //   logGroupName: "firehose_log",
-        //   logStreamName: "S3delivery"
-        // },
+        cloudWatchLoggingOptions: {
+          enabled: true,
+          logGroupName: firehoseLogGroup.logGroupName,
+          logStreamName: firehoseLogStream.logStreamName
+        },
         compressionFormat: "UNCOMPRESSED",
         prefix: "json-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/",
         errorOutputPrefix: "error-json/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/!{firehose:error-output-type}"
       }
     })
 
+
+    
     
     const fargateSvc = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'ecs-service', {
       cluster,
@@ -103,21 +67,20 @@ export class EcsCdkStack extends cdk.Stack {
           options: {
             Name: 'firehose',
             region: cdk.Stack.of(this).region,
-            delivery_stream: stream.deliveryStreamName
+            delivery_stream: stream.deliveryStreamName!
           }
         })
       },
-    });
-    
-    fargateSvc.targetGroup.configureHealthCheck({
-      path: "/custom-health-path",
     });
     
     fargateSvc.taskDefinition.addFirelensLogRouter('ecs-firelens', {
       image: ecs.obtainDefaultFluentBitECRImage(fargateSvc.taskDefinition, fargateSvc.taskDefinition.defaultContainer?.logDriverConfig),
       firelensConfig: {
         type: ecs.FirelensLogRouterType.FLUENTBIT
-      }
+      },
+      logging: new ecs.AwsLogDriver({streamPrefix: 'firelens'})
     })
+    
+
   }
 }
