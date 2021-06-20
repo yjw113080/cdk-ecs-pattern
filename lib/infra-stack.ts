@@ -6,10 +6,17 @@ import * as s3 from '@aws-cdk/aws-s3';
 import * as iam from '@aws-cdk/aws-iam';
 import * as logs from '@aws-cdk/aws-logs';
 import * as firehose from '@aws-cdk/aws-kinesisfirehose';
-import * as ecsPatterns from '@aws-cdk/aws-ecs-patterns';
-import * as secretsmanager from '@aws-cdk/aws-secretsmanager';
 
-export class EcsCdkStack extends cdk.Stack {
+
+/*
+    Example for Stack seperation
+*/
+export class InfraStack extends cdk.Stack {
+
+    public readonly cluster: ecs.Cluster;
+    public readonly ecrRepository: ecr.Repository;
+    public readonly firehoseStream: firehose.CfnDeliveryStream;
+
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -21,7 +28,7 @@ export class EcsCdkStack extends cdk.Stack {
       containerInsights: true
     });
     
-    const repo = new ecr.Repository(this, 'PetclinicRepo');
+    const ecrRepo = new ecr.Repository(this, 'PetclinicRepo');
     
     // Create s3 bucket to store logs
     const bucket = new s3.Bucket(this, 'LogBucket', {
@@ -56,33 +63,14 @@ export class EcsCdkStack extends cdk.Stack {
         errorOutputPrefix: "error-json/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/!{firehose:error-output-type}"
       }
     })
-    
-    
-    const ftkSvc = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'petclinic-service', {
-      cluster,
-      memoryLimitMiB: 1024,
-      cpu: 512,
-      taskImageOptions: {
-        image: ecs.ContainerImage.fromEcrRepository(repo),
-        containerPort: 8080,
-        logDriver: ecs.LogDrivers.firelens({
-          options: {
-            Name: 'firehose',
-            region: cdk.Stack.of(this).region,
-            delivery_stream: stream.deliveryStreamName!
-          }
-        })
-      },
-    });
-    
-    ftkSvc.taskDefinition.addFirelensLogRouter('ecs-firelens', {
-      image: ecs.obtainDefaultFluentBitECRImage(ftkSvc.taskDefinition, ftkSvc.taskDefinition.defaultContainer?.logDriverConfig),
-      firelensConfig: {
-        type: ecs.FirelensLogRouterType.FLUENTBIT
-      },
-      logging: new ecs.AwsLogDriver({streamPrefix: 'firelens'})
-    })  
-    
+
+
 
   }
+}
+
+export interface InfraProps extends cdk.StackProps {
+    cluster: ecs.Cluster,
+    ecrRepository: ecr.Repository,
+    stream: firehose.CfnDeliveryStream
 }
