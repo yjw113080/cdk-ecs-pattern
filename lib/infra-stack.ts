@@ -28,7 +28,7 @@ export class InfraStack extends cdk.Stack {
       containerInsights: true
     });
     
-    const ecrRepo = new ecr.Repository(this, 'PetclinicRepo');
+    const ecrRepo = new ecr.Repository(this, 'DemoRepo');
     
     // Create s3 bucket to store logs
     const bucket = new s3.Bucket(this, 'LogBucket', {
@@ -59,11 +59,10 @@ export class InfraStack extends cdk.Stack {
           logStreamName: firehoseLogStream.logStreamName
         },
         compressionFormat: "UNCOMPRESSED",
-        prefix: "json-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/",
+        prefix: "/location/dt/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/",
         errorOutputPrefix: "error-json/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/!{firehose:error-output-type}"
       }
     })
-
 
 
   }
