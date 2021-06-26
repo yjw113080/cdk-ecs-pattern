@@ -28,7 +28,7 @@ export class InfraStack extends cdk.Stack {
       containerInsights: true
     });
     
-    const ecrRepo = new ecr.Repository(this, 'PetclinicRepo');
+    const ecrRepo = new ecr.Repository(this, 'DemoRepo');
     
     // Create s3 bucket to store logs
     const bucket = new s3.Bucket(this, 'LogBucket', {
@@ -64,7 +64,9 @@ export class InfraStack extends cdk.Stack {
       }
     })
 
-
+    this.cluster = cluster;
+    this.ecrRepository = ecrRepo;
+    this.firehoseStream = stream;
 
   }
 }
