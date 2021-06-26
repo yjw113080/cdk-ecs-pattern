@@ -59,8 +59,9 @@ export class InfraStack extends cdk.Stack {
           logStreamName: firehoseLogStream.logStreamName
         },
         compressionFormat: "UNCOMPRESSED",
-        prefix: "json-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/",
-        errorOutputPrefix: "error-json/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/!{firehose:error-output-type}"
+        prefix: "log/dt=!{timestamp:yyyy-MM-dd}/",
+        errorOutputPrefix: "error-log/dt=!{timestamp:yyyy-MM-dd}/"
+
       }
     })
 
