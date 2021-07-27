@@ -33,6 +33,16 @@
     "@aws-cdk/aws-s3": "^1.109.0",
     "@aws-cdk/aws-secretsmanager": "^1.109.0",
     "@aws-cdk/core": "1.109.0",
+    "@aws-cdk/aws-elasticloadbalancingv2": "^1.109.0",
+    "@aws-cdk/aws-elasticloadbalancingv2-targets": "^1.109.0",
+    "@aws-cdk/aws-codecommit": "^1.109.0",
+    "@aws-cdk/aws-codebuild": "^1.109.0",
+    "@aws-cdk/aws-codedeploy": "^1.109.0",
+    "@aws-cdk/aws-codepipeline": "^1.109.0",
+    "@aws-cdk/aws-codepipeline-actions": "^1.109.0",
+    "@aws-cdk/aws-events-targets": "^1.109.0",
+    "@aws-cdk/aws-lambda": "^1.109.0",
+    "@aws-cdk/aws-cloudwatch": "^1.109.0",
     "source-map-support": "^0.5.16"
   }
 }

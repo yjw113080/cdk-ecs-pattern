@@ -9,35 +9,35 @@ import { InfraProps } from './infra-stack';
     Example for Stack seperation
 */
 export class EcsSvcStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props: InfraProps) {
+  constructor(scope: cdk.Construct, id: string, props?: InfraProps) {
     super(scope, id, props);
 
-
-    // Task Definition
-    const td = new ecs.FargateTaskDefinition(this, 'TaskDefn', {
-      family: 'FoodtechDemo',
+    
+    const svc = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'demo-service', {
+      cluster: props?.cluster,
+      memoryLimitMiB: 1024,
       cpu: 512,
-      memoryLimitMiB: 1024      
-    })
-
-    td.addContainer('App', {
-      image: ecs.ContainerImage.fromEcrRepository(props.ecrRepository),
-      portMappings: [{
-        containerPort: 8080
-      }],
-      logging: ecs.LogDrivers.firelens({
-        options: {
-          Name: 'firehose',
-          region: cdk.Stack.of(this).region,
-          delivery_stream: props.stream.deliveryStreamName!
-        }
-      })
-    })
-
-    td.addFirelensLogRouter('Firelens', {
-      image: ecs.obtainDefaultFluentBitECRImage(td, td.defaultContainer?.logDriverConfig),
-      firelensConfig: { type: ecs.FirelensLogRouterType.FLUENTBIT }
-    }) 
+      taskImageOptions: {
+        image: ecs.ContainerImage.fromEcrRepository(props?.ecrRepository!),
+        // image: ecs.ContainerImage.fromRegistry('amazon/amazon-ecs-sample'),
+        containerPort: 8080,
+        logDriver: ecs.LogDrivers.firelens({
+          options: {
+            Name: 'firehose',
+            region: cdk.Stack.of(this).region,
+            delivery_stream: props?.stream.deliveryStreamName!
+          }
+        })
+      },
+    });
+    
+    svc.taskDefinition.addFirelensLogRouter('ecs-firelens', {
+      image: ecs.obtainDefaultFluentBitECRImage(svc.taskDefinition, svc.taskDefinition.defaultContainer?.logDriverConfig),
+      firelensConfig: {
+        type: ecs.FirelensLogRouterType.FLUENTBIT
+      },
+      logging: new ecs.AwsLogDriver({streamPrefix: 'firelens'})
+    })  
     
 
   }
