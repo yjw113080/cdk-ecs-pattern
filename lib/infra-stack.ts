@@ -6,13 +6,13 @@ import * as s3 from '@aws-cdk/aws-s3';
 import * as iam from '@aws-cdk/aws-iam';
 import * as logs from '@aws-cdk/aws-logs';
 import * as firehose from '@aws-cdk/aws-kinesisfirehose';
+import * as elb from '@aws-cdk/aws-elasticloadbalancingv2';
 
 
 /*
     Example for Stack seperation
 */
 export class InfraStack extends cdk.Stack {
-
     public readonly cluster: ecs.Cluster;
     public readonly ecrRepository: ecr.Repository;
     public readonly firehoseStream: firehose.CfnDeliveryStream;
@@ -59,12 +59,69 @@ export class InfraStack extends cdk.Stack {
           logStreamName: firehoseLogStream.logStreamName
         },
         compressionFormat: "UNCOMPRESSED",
-        prefix: "/location/dt/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/",
-        errorOutputPrefix: "error-json/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/!{firehose:error-output-type}"
+        prefix: "log/dt=!{timestamp:yyyy-MM-dd}/",
+        errorOutputPrefix: "error-log/dt=!{timestamp:yyyy-MM-dd}/"
       }
     })
 
+    const alb = new elb.ApplicationLoadBalancer(this, 'alb', {
+      vpc,
+      internetFacing: true
+    })
+    const albProdListener = alb.addListener('albProdListener', {
+      port: 80
+    });
+    const albTestListener = alb.addListener('albTestListener', {
+        port: 8080
+    });
+    albProdListener.connections.allowDefaultPortFromAnyIpv4('Allow traffic from everywhere');
+    albTestListener.connections.allowDefaultPortFromAnyIpv4('Allow traffic from everywhere');
 
+    const blueGroup = new elb.ApplicationTargetGroup(this, "blueGroup", {
+      vpc: vpc,
+      protocol: elb.ApplicationProtocol.HTTP,
+      port: 80,
+      targetType: elb.TargetType.IP,
+      healthCheck: {
+          path: "/",
+          timeout: cdk.Duration.seconds(10),
+          interval: cdk.Duration.seconds(15),
+          healthyHttpCodes: "200,404"
+      }
+  });
+
+  // Target group 2
+    const greenGroup = new elb.ApplicationTargetGroup(this, "greenGroup", {
+        vpc: vpc,
+        protocol: elb.ApplicationProtocol.HTTP,
+        port: 80,
+        targetType: elb.TargetType.IP,
+        healthCheck: {
+            path: "/",
+            timeout: cdk.Duration.seconds(10),
+            interval: cdk.Duration.seconds(15),
+            healthyHttpCodes: "200,404"
+        }
+    });
+
+    // Registering the blue target group with the production listener of load balancer
+    albProdListener.addTargetGroups("blueTarget", {
+        targetGroups: [blueGroup]
+    });
+
+    // Registering the green target group with the test listener of load balancer
+    albTestListener.addTargetGroups("greenTarget", {
+        targetGroups: [greenGroup]
+    });
+
+
+    // 젠킨스 서버에 추가부여할 롤
+    // iam.Role.fromRoleArn("XXXXX").addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3ReadOnlyAccess"))
+    // iam.Role.fromRoleArn("XXXXX").addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AWSCodeDeployDeployerAccess"))
+
+    this.cluster = cluster;
+    this.ecrRepository = ecrRepo;
+    this.firehoseStream = stream;
   }
 }
 

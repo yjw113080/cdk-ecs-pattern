@@ -11,6 +11,7 @@ const app = new cdk.App();
 
 const infraStack = new InfraStack(app, 'InfraStack');
 new EcsSvcStack(app, 'EcsSvcStack', {
+  // vpc: infraStack.vpc,
   ecrRepository: infraStack.ecrRepository,
   cluster: infraStack.cluster,
   stream: infraStack.firehoseStream
